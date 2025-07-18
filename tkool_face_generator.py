@@ -110,7 +110,7 @@ def main():
     )
     
     st.title("🎮 TKOOL Face Sheet Generator")
-    st.markdown("**TKOOLのFace画像企画に合わせた144px正方形の表情シート作成ツール**")
+    st.markdown("**TKOOLのFace画像規格に合わせた144pxの表情シート作成ツール**")
     
     # サイドバーで設定
     st.sidebar.header("⚙️ 設定")
