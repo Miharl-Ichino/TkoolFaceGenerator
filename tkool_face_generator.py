@@ -8,9 +8,10 @@ import tempfile
 from typing import List, Tuple
 
 def process_images(uploaded_files: List, crop_width: int = 144, crop_height: int = 144, 
-                  columns: int = 4, rows: int = 2) -> List[Tuple[Image.Image, str]]:
+                  columns: int = 4, rows: int = 2, max_width: int = 400) -> List[Tuple[Image.Image, str]]:
     """
     アップロードされた画像を処理し、複数のシートに分割する
+    大きすぎる画像は自動的にリサイズする
     """
     max_images_per_sheet = columns * rows
     cropped_images = []
@@ -24,6 +25,17 @@ def process_images(uploaded_files: List, crop_width: int = 144, crop_height: int
                 img = img.convert('RGBA')
             
             w, h = img.size
+            
+            # 画像が大きすぎる場合は自動リサイズ
+            if w > max_width:
+                # アスペクト比を維持してリサイズ
+                ratio = max_width / w
+                new_width = max_width
+                new_height = int(h * ratio)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                st.info(f"📏 画像 '{uploaded_file.name}' を {w}×{h} から {new_width}×{new_height} にリサイズしました")
+                w, h = new_width, new_height
+            
             center_x = w // 2
             left = center_x - crop_width // 2
             upper = 0
@@ -32,7 +44,7 @@ def process_images(uploaded_files: List, crop_width: int = 144, crop_height: int
             
             # 画像サイズチェック
             if left < 0 or right > w or lower > h:
-                st.warning(f"画像 '{uploaded_file.name}' のサイズが小さすぎます。スキップします。")
+                st.warning(f"画像 '{uploaded_file.name}' のサイズが小さすぎます（{w}×{h}）。切り出しサイズ {crop_width}×{crop_height} に対して不十分です。スキップします。")
                 continue
                 
             cropped = img.crop((left, upper, right, lower))
@@ -136,7 +148,19 @@ def main():
     )
     
     st.sidebar.markdown("---")
+    st.sidebar.subheader("🔧 リサイズ設定")
+    
+    max_width = st.sidebar.number_input(
+        "最大幅 (px)", 
+        min_value=200, 
+        max_value=1000, 
+        value=400,
+        help="この幅を超える画像は自動的にリサイズされます"
+    )
+    
+    st.sidebar.markdown("---")
     st.sidebar.markdown(f"**1シートあたり最大: {columns * rows} 画像**")
+    st.sidebar.markdown(f"**自動リサイズ: {max_width}px を超える画像**")
     
     # メインコンテンツ
     col1, col2 = st.columns([2, 1])
@@ -147,7 +171,7 @@ def main():
             "画像ファイルを選択してください",
             type=['png', 'jpg', 'jpeg'],
             accept_multiple_files=True,
-            help="複数の画像を選択できます。各画像は中央から切り出されます。"
+            help="複数の画像を選択できます。各画像は中央から切り出されます。大きすぎる画像は自動的にリサイズされます。"
         )
         
         if uploaded_files:
@@ -159,7 +183,10 @@ def main():
                 for i, file in enumerate(uploaded_files[:4]):  # 最初の4個だけ表示
                     with preview_cols[i]:
                         img = Image.open(file)
-                        st.image(img, caption=file.name, use_column_width=True)
+                        # 画像サイズ情報を表示
+                        w, h = img.size
+                        resize_info = f" (→リサイズ対象)" if w > max_width else ""
+                        st.image(img, caption=f"{file.name}\n{w}×{h}{resize_info}", use_column_width=True)
                 
                 if len(uploaded_files) > 4:
                     st.info(f"他に {len(uploaded_files) - 4} 個の画像があります")
@@ -171,9 +198,22 @@ def main():
             images_per_sheet = columns * rows
             total_sheets = math.ceil(total_images / images_per_sheet)
             
+            # 大きすぎる画像の数をカウント
+            large_images = 0
+            for file in uploaded_files:
+                try:
+                    img = Image.open(file)
+                    if img.size[0] > max_width:
+                        large_images += 1
+                except:
+                    pass
+            
             st.metric("総画像数", total_images)
             st.metric("作成されるシート数", total_sheets)
             st.metric("1シートあたりの画像数", f"{images_per_sheet} (最大)")
+            
+            if large_images > 0:
+                st.warning(f"🔧 {large_images} 個の画像が {max_width}px を超えているため、自動リサイズされます")
             
             if total_sheets > 1:
                 st.info(f"💡 {images_per_sheet} 枚を超える画像があるため、複数のシートに分割されます")
@@ -187,7 +227,8 @@ def main():
                     crop_width, 
                     crop_height, 
                     columns, 
-                    rows
+                    rows,
+                    max_width
                 )
                 
                 if not sheets:
@@ -249,13 +290,20 @@ def main():
         ### 特徴
         - 🎯 各画像は中央から指定サイズで切り出されます
         - 🔄 透過情報（PNG）を保持します
+        - 📏 **NEW!** 大きすぎる画像は自動的にリサイズされます（デフォルト400px）
         - 📊 8枚（4×2）を超える画像は自動的に複数シートに分割されます
         - 📦 複数シートの場合はZIPファイルで一括ダウンロード可能
         - 🎮 TKOOLのFace画像企画に最適化されています
         
+        ### 自動リサイズ機能
+        - 横幅が指定した最大幅を超える画像は自動的にリサイズされます
+        - アスペクト比を維持してリサイズするため、画像の縦横比は保たれます
+        - リサイズされた画像には処理時に通知が表示されます
+        
         ### 注意事項
         - 画像が指定サイズより小さい場合はスキップされます
         - 処理できない画像がある場合は警告が表示されます
+        - リサイズ処理により画像品質が若干低下する場合があります
         """)
 
 if __name__ == "__main__":
