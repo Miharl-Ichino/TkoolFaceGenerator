@@ -153,8 +153,8 @@ def main():
     max_width = st.sidebar.number_input(
         "最大幅 (px)", 
         min_value=200, 
-        max_value=1000, 
-        value=400,
+        max_value=800, 
+        value=300,
         help="この幅を超える画像は自動的にリサイズされます"
     )
     
