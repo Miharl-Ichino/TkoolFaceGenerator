@@ -38,13 +38,13 @@ def process_images(uploaded_files: List, crop_width: int = 144, crop_height: int
             
             center_x = w // 2
             left = center_x - crop_width // 2
-            upper = 0
+            upper = 20  # 上20px削る
             right = center_x + crop_width // 2
-            lower = crop_height
+            lower = upper + crop_height
             
-            # 画像サイズチェック
+            # 画像サイズチェック（上20px削る分も考慮）
             if left < 0 or right > w or lower > h:
-                st.warning(f"画像 '{uploaded_file.name}' のサイズが小さすぎます（{w}×{h}）。切り出しサイズ {crop_width}×{crop_height} に対して不十分です。スキップします。")
+                st.warning(f"画像 '{uploaded_file.name}' のサイズが小さすぎます（{w}×{h}）。切り出しサイズ {crop_width}×{crop_height} + 上20px削る分に対して不十分です。スキップします。")
                 continue
                 
             cropped = img.crop((left, upper, right, lower))
@@ -153,8 +153,8 @@ def main():
     max_width = st.sidebar.number_input(
         "最大幅 (px)", 
         min_value=200, 
-        max_value=800, 
-        value=300,
+        max_value=900, 
+        value=310,
         help="この幅を超える画像は自動的にリサイズされます"
     )
     
@@ -288,7 +288,7 @@ def main():
         4. **ダウンロード**: 作成されたシートを個別またはまとめてダウンロード
         
         ### 特徴
-        - 🎯 各画像は中央から指定サイズで切り出されます
+        - 🎯 各画像は中央から指定サイズで切り出されます（上20px削る）
         - 🔄 透過情報（PNG）を保持します
         - 📏 **NEW!** 大きすぎる画像は自動的にリサイズされます（デフォルト400px）
         - 📊 8枚（4×2）を超える画像は自動的に複数シートに分割されます
